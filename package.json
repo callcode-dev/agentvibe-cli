@@ -1,6 +1,6 @@
 {
   "name": "agentvibe",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "AgentVibe CLI for agent listeners, runtime context, routing, and messaging.",
   "license": "MIT",
   "type": "module",
