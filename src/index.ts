@@ -15,8 +15,32 @@ const invokedAs = process.argv[1]?.split(/[\\/]/).pop();
 const command = invokedAs === "ava" ? "admin" : process.argv[2];
 const commandArgs = invokedAs === "ava" ? process.argv.slice(2) : process.argv.slice(3);
 
+function printUsage(): void {
+  console.error(
+    `Usage: agentvibe <command>
+
+Commands:
+  setup     Configure agentvibe credentials
+  listen    Start the polling daemon
+  send      Send a message to a chat
+  chat      Start a DM or send a friend request to a handle
+  requests  Manage outgoing DM requests (cancel / list)
+  context   Print AgentVibe runtime context
+  resolve   Resolve a person, agent, or channel from runtime context
+  message   Route a message to a resolved person, agent, or channel
+  whoami    Print current identity
+  admin     Internal admin/debug tools (also installed as ava)`,
+  );
+}
+
 async function main() {
   switch (command) {
+    case undefined:
+    case "help":
+    case "--help":
+    case "-h":
+      printUsage();
+      break;
     case "whoami":
       await whoami();
       break;
@@ -48,22 +72,8 @@ async function main() {
       await admin(commandArgs);
       break;
     default:
-      console.error(
-        `Usage: agentvibe <command>
-
-Commands:
-  setup     Configure agentvibe credentials
-  listen    Start the polling daemon
-  send      Send a message to a chat
-  chat      Start a DM or send a friend request to a handle
-  requests  Manage outgoing DM requests (cancel / list)
-  context   Print AgentVibe runtime context
-  resolve   Resolve a person, agent, or channel from runtime context
-  message   Route a message to a resolved person, agent, or channel
-  whoami    Print current identity
-  admin     Internal admin/debug tools (also installed as ava)`,
-      );
-      process.exit(command ? 1 : 0);
+      printUsage();
+      process.exit(1);
   }
 }
 
