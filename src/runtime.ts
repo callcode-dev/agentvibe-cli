@@ -1,4 +1,3 @@
-import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { loadConfig, type CliConfig } from "./config.js";
@@ -44,10 +43,9 @@ export interface RuntimeAuth {
 export interface LoadedRuntime {
   auth: RuntimeAuth;
   context: AgentVibeRuntimeConfig;
-  contextSource: "env" | "file" | "none";
+  contextSource: "api";
 }
 
-const DEFAULT_RUNTIME_PATH = join(homedir(), ".agentvibe", "runtime.json");
 const DEFAULT_CONFIG_PATH = join(homedir(), ".agentvibe", "config.json");
 
 export function loadRuntimeAuth(): RuntimeAuth {
@@ -59,27 +57,22 @@ export function loadRuntimeAuth(): RuntimeAuth {
   return { apiKey: config.apiKey, baseUrl: config.baseUrl, source: "config", config };
 }
 
-export function loadRuntimeContext(path = DEFAULT_RUNTIME_PATH): {
-  context: AgentVibeRuntimeConfig;
-  source: "env" | "file" | "none";
-} {
-  const rawEnv = process.env.AGENTVIBE_CONTEXT_JSON ?? process.env.AGENTVIBE_RUNTIME_JSON;
-  if (rawEnv) return { context: JSON.parse(rawEnv) as AgentVibeRuntimeConfig, source: "env" };
-
-  if (existsSync(path)) {
-    return {
-      context: JSON.parse(readFileSync(path, "utf-8")) as AgentVibeRuntimeConfig,
-      source: "file",
-    };
+export async function fetchRuntimeContext(
+  auth = loadRuntimeAuth(),
+): Promise<AgentVibeRuntimeConfig> {
+  const url = new URL("/api/agents/me/runtime-context", auth.baseUrl);
+  const res = await fetch(url, { headers: { "x-api-key": auth.apiKey } });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch AgentVibe runtime context (${res.status}): ${body}`);
   }
-
-  return { context: {}, source: "none" };
+  return (await res.json()) as AgentVibeRuntimeConfig;
 }
 
-export function loadRuntime(): LoadedRuntime {
+export async function loadRuntime(): Promise<LoadedRuntime> {
   const auth = loadRuntimeAuth();
-  const { context, source } = loadRuntimeContext();
-  return { auth, context, contextSource: source };
+  const context = await fetchRuntimeContext(auth);
+  return { auth, context, contextSource: "api" };
 }
 
 function normalizeName(value: string): string {

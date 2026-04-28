@@ -1,37 +1,81 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import http from "node:http";
 
-const env = {
-  ...process.env,
-  AGENTVIBE_CONTEXT_JSON: JSON.stringify({
-    defaultSlackAppId: "A123",
-    channels: { agents: { type: "slack-channel", channel: "C0B0F13M8R0" } },
-    targets: {
-      "tanay-clone": {
-        type: "slack-user",
-        slackUserId: "U0B0TPVC0V6",
-        label: "Tanay (clone)",
-        defaultChannel: "agents",
-      },
-      tanay: { type: "slack-user", slackUserId: "U0B0BLLQDCH", defaultChannel: "agents" },
+const execFileAsync = promisify(execFile);
+
+const runtimeContext = {
+  defaultSlackAppId: "A123",
+  channels: { agents: { type: "slack-channel", channel: "C0B0F13M8R0" } },
+  targets: {
+    "tanay-clone": {
+      type: "slack-user",
+      slackUserId: "U0B0TPVC0V6",
+      label: "Tanay (clone)",
+      defaultChannel: "agents",
     },
-    aliases: { "tanay himself": "tanay", "tanay clone": "tanay-clone" },
-  }),
+    tanay: { type: "slack-user", slackUserId: "U0B0BLLQDCH", defaultChannel: "agents" },
+  },
+  aliases: { "tanay-himself": "tanay", "tanay-clone": "tanay-clone" },
 };
 
-function cli(args) {
-  return execFileSync(process.execPath, ["dist/index.js", ...args], { env, encoding: "utf8" });
+async function withServer(fn) {
+  const server = http.createServer((req, res) => {
+    assert.equal(req.headers["x-api-key"], "test-key");
+    if (req.url === "/api/agents/me/runtime-context") {
+      res.setHeader("content-type", "application/json");
+      res.setHeader("connection", "close");
+      res.end(JSON.stringify(runtimeContext));
+      return;
+    }
+    res.statusCode = 404;
+    res.end("not found");
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert(address && typeof address === "object");
+  try {
+    await fn(`http://127.0.0.1:${address.port}`);
+  } finally {
+    server.closeIdleConnections?.();
+    server.closeAllConnections?.();
+    await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+  }
 }
 
-test("resolve supports aliases", () => {
-  const resolved = JSON.parse(cli(["resolve", "tanay", "clone"]));
-  assert.equal(resolved.target.type, "slack-user");
-  assert.equal(resolved.target.slackUserId, "U0B0TPVC0V6");
+async function cli(args, baseUrl) {
+  const { stdout } = await execFileAsync(process.execPath, ["dist/index.js", ...args], {
+    env: {
+      ...process.env,
+      AGENTVIBE_API_KEY: "test-key",
+      AGENTVIBE_API_BASE_URL: baseUrl,
+    },
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  return stdout;
+}
+
+test("resolve fetches runtime context from the API and supports aliases", async () => {
+  await withServer(async (baseUrl) => {
+    const resolved = JSON.parse(await cli(["resolve", "tanay", "clone"], baseUrl));
+    assert.equal(resolved.target.type, "slack-user");
+    assert.equal(resolved.target.slackUserId, "U0B0TPVC0V6");
+  });
 });
 
-test("message dry-run routes user targets through default channel mentions", () => {
-  const routed = JSON.parse(cli(["message", "--dry-run", "tanay himself", "please", "review"]));
-  assert.deepEqual(routed.target, { type: "slack-channel", appId: "A123", channel: "C0B0F13M8R0" });
-  assert.equal(routed.parts[0].text, "<@U0B0BLLQDCH> please review");
+test("message dry-run routes user targets through default channel mentions", async () => {
+  await withServer(async (baseUrl) => {
+    const routed = JSON.parse(
+      await cli(["message", "--dry-run", "tanay himself", "please", "review"], baseUrl),
+    );
+    assert.deepEqual(routed.target, {
+      type: "slack-channel",
+      appId: "A123",
+      channel: "C0B0F13M8R0",
+    });
+    assert.equal(routed.parts[0].text, "<@U0B0BLLQDCH> please review");
+  });
 });

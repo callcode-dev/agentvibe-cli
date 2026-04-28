@@ -1,4 +1,4 @@
-import { loadRuntimeContext, resolveRuntimeTarget } from "../runtime.js";
+import { fetchRuntimeContext, resolveRuntimeTarget } from "../runtime.js";
 
 export async function resolve(argv: string[]): Promise<void> {
   const name = argv.join(" ").trim();
@@ -7,7 +7,7 @@ export async function resolve(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const { context } = loadRuntimeContext();
+  const context = await fetchRuntimeContext();
   const resolved = resolveRuntimeTarget(name, context);
   if (!resolved) {
     console.error(`Could not resolve ${JSON.stringify(name)} from AgentVibe runtime context`);

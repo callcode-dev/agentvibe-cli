@@ -1,8 +1,8 @@
 import { AgentVibeClient, type Part, type ProactiveSendTarget } from "agentvibe-sdk";
 import { handleQuotaError } from "../lib/handleQuotaError.js";
 import {
+  fetchRuntimeContext,
   loadRuntimeAuth,
-  loadRuntimeContext,
   resolveRuntimeTarget,
   type RuntimeTarget,
 } from "../runtime.js";
@@ -50,7 +50,8 @@ export async function message(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const { context } = loadRuntimeContext();
+  const auth = loadRuntimeAuth();
+  const context = await fetchRuntimeContext(auth);
   const resolved = resolveRuntimeTarget(targetName, context);
   if (!resolved) {
     console.error(`Could not resolve ${JSON.stringify(targetName)} from AgentVibe runtime context`);
@@ -77,7 +78,6 @@ export async function message(argv: string[]): Promise<void> {
     return;
   }
 
-  const auth = loadRuntimeAuth();
   const client = new AgentVibeClient({
     apiKey: auth.apiKey,
     baseUrl: auth.baseUrl,

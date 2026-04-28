@@ -19,7 +19,4 @@ jobs:
       - run: npm ci
       - run: npm run check
       - name: Smoke test CLI
-        run: |
-          node dist/index.js --help
-          node dist/index.js context
-          AGENTVIBE_CONTEXT_JSON='{"channels":{"agents":{"type":"slack-channel","channel":"C123"}},"targets":{"tanay":{"type":"slack-user","slackUserId":"U123","defaultChannel":"agents"}},"defaultSlackAppId":"A123"}' node dist/index.js message --dry-run tanay hello
+        run: node dist/index.js --help
