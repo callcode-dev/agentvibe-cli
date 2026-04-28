@@ -1,11 +1,6 @@
-import type {
-  Part,
-  ProactiveSendResponse,
-  ProactiveSendTarget,
-  SendMessageResponse,
-} from "../api-types.js";
-import { createClient, parseJsonResponse } from "../client.js";
-import { loadRuntimeContext, resolveRuntimeTarget, type RuntimeTarget } from "../runtime.js";
+import { AgentVibeClient, type Part, type ProactiveSendTarget } from "agentvibe-sdk";
+import { handleQuotaError } from "../lib/handleQuotaError.js";
+import { loadRuntime, resolveRuntimeTarget, type RuntimeTarget } from "../runtime.js";
 
 function readOption(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -23,13 +18,18 @@ function readFlag(argv: string[], name: string): boolean {
   return true;
 }
 
-function toDeliveryTarget(target: RuntimeTarget, defaultSlackAppId?: string): ProactiveSendTarget {
-  if (target.type === "agentvibe-chat") return { type: "agentvibe-chat", chatId: target.chatId };
-  const appId = target.slackAppId ?? defaultSlackAppId;
-  if (!appId) throw new Error("Missing slackAppId/defaultSlackAppId for Slack delivery");
-  if (target.type === "slack-channel")
+function slackTarget(target: RuntimeTarget, defaultSlackAppId?: string): ProactiveSendTarget {
+  if (target.type === "slack-channel") {
+    const appId = target.slackAppId ?? defaultSlackAppId;
+    if (!appId) throw new Error("Missing slackAppId/defaultSlackAppId for Slack channel send");
     return { type: "slack-channel", appId, channel: target.channel };
-  return { type: "slack-dm", appId, slackUserId: target.slackUserId };
+  }
+  if (target.type === "slack-user") {
+    const appId = target.slackAppId ?? defaultSlackAppId;
+    if (!appId) throw new Error("Missing slackAppId/defaultSlackAppId for Slack DM send");
+    return { type: "slack-dm", appId, slackUserId: target.slackUserId };
+  }
+  return { type: "agentvibe-chat", chatId: target.chatId };
 }
 
 export async function message(argv: string[]): Promise<void> {
@@ -45,8 +45,8 @@ export async function message(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const { context } = loadRuntimeContext();
-  const resolved = resolveRuntimeTarget(targetName, context);
+  const runtime = loadRuntime();
+  const resolved = resolveRuntimeTarget(targetName, runtime.context);
   if (!resolved) {
     console.error(`Could not resolve ${JSON.stringify(targetName)} from AgentVibe runtime context`);
     process.exit(1);
@@ -57,7 +57,7 @@ export async function message(argv: string[]): Promise<void> {
 
   if (target.type === "slack-user" && (channelOverride || target.defaultChannel)) {
     const channelName = channelOverride ?? target.defaultChannel;
-    const channel = channelName ? resolveRuntimeTarget(channelName, context) : null;
+    const channel = channelName ? resolveRuntimeTarget(channelName, runtime.context) : null;
     if (!channel || channel.target.type !== "slack-channel") {
       throw new Error(`Could not resolve Slack channel ${JSON.stringify(channelName)}`);
     }
@@ -65,26 +65,33 @@ export async function message(argv: string[]): Promise<void> {
     target = channel.target;
   }
 
-  const deliveryTarget = toDeliveryTarget(target, context.defaultSlackAppId);
+  const deliveryTarget = slackTarget(target, runtime.context.defaultSlackAppId);
+
   if (dryRun) {
     console.log(JSON.stringify({ target: deliveryTarget, parts }, null, 2));
     return;
   }
 
-  const { client } = createClient();
-  if (deliveryTarget.type === "agentvibe-chat") {
-    const res = await client.api.chats[":id"].messages.$post({
-      param: { id: deliveryTarget.chatId },
-      json: { parts },
-    });
-    const data = await parseJsonResponse<SendMessageResponse>(res);
-    console.log(`Message sent (id: ${data.message.id})`);
-    return;
-  }
+  const client = new AgentVibeClient({
+    apiKey: runtime.auth.apiKey,
+    baseUrl: runtime.auth.baseUrl,
+  });
+  try {
+    if (deliveryTarget.type === "agentvibe-chat") {
+      const textPart = parts[0];
+      if (!textPart || textPart.type !== "text")
+        throw new Error("agentvibe-chat sends require text");
+      const res = await client.send(deliveryTarget.chatId, textPart.text);
+      console.log(`Message sent (id: ${res.message.id})`);
+      return;
+    }
 
-  const res = await client.api.agents.me.send.$post({ json: { target: deliveryTarget, parts } });
-  const data = await parseJsonResponse<ProactiveSendResponse>(res);
-  console.log(
-    `Message sent (id: ${data.messageId}${data.slackTs ? `, slackTs: ${data.slackTs}` : ""})`,
-  );
+    const res = await client.proactiveSend({ target: deliveryTarget, parts });
+    console.log(
+      `Message sent (id: ${res.messageId}${res.slackTs ? `, slackTs: ${res.slackTs}` : ""})`,
+    );
+  } catch (err) {
+    if (handleQuotaError(err)) process.exit(1);
+    throw err;
+  }
 }

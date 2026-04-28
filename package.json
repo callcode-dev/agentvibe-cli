@@ -1,14 +1,16 @@
 {
   "name": "agentvibe",
-  "version": "0.4.0",
-  "description": "AgentVibe CLI for agent runtime context, routing, and messaging.",
+  "version": "0.4.1",
+  "description": "AgentVibe CLI for agent listeners, runtime context, routing, and messaging.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "agentvibe": "dist/index.js"
+    "agentvibe": "./dist/index.js",
+    "ava": "./dist/index.js"
   },
   "files": [
     "dist",
+    "manifests",
     "README.md",
     "LICENSE"
   ],
@@ -22,7 +24,8 @@
     "check": "npm run typecheck && npm run build && npm test && npm run format"
   },
   "dependencies": {
-    "hono": "^4.12.10"
+    "hono": "^4.12.10",
+    "agentvibe-sdk": "^0.2.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",

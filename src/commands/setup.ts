@@ -1,29 +1,70 @@
-import type { MeResponse } from "../api-types.js";
-import { parseJsonResponse } from "../client.js";
-import { saveRuntimeAuth } from "../runtime.js";
-import { hc } from "hono/client";
-import type { AppType } from "../api-types.js";
+import { AgentVibeClient } from "agentvibe-sdk";
+import { saveConfig, DEFAULT_DAEMON_CONFIG } from "../config.js";
 
-function readOption(argv: string[], name: string): string | undefined {
-  const index = argv.indexOf(name);
-  if (index === -1) return undefined;
-  const value = argv[index + 1];
-  if (!value) throw new Error(`${name} requires a value`);
-  argv.splice(index, 2);
-  return value;
+interface SetupArgs {
+  apiKey: string;
+  baseUrl: string;
+  command?: string;
 }
 
-export async function setup(argv: string[]): Promise<void> {
-  const apiKey = readOption(argv, "--api-key");
-  const baseUrl = readOption(argv, "--base-url") ?? readOption(argv, "--api-base-url");
+export function parseSetupArgs(argv: string[]): SetupArgs {
+  let apiKey = "";
+  let baseUrl = "";
+  let command: string | undefined;
+
+  for (let i = 0; i < argv.length; i++) {
+    switch (argv[i]) {
+      case "--api-key":
+        apiKey = argv[++i] ?? "";
+        break;
+      case "--base-url":
+        baseUrl = argv[++i] ?? "";
+        break;
+      case "--command":
+        command = argv[++i] ?? "";
+        break;
+    }
+  }
+
   if (!apiKey || !baseUrl) {
-    console.error("Usage: agentvibe setup --api-key <key> --base-url <url>");
+    console.error("Usage: agentvibe setup --api-key <key> --base-url <url> [--command <cmd>]");
     process.exit(1);
   }
 
-  const client = hc<AppType>(baseUrl.replace(/\/+$/, ""), { headers: { "x-api-key": apiKey } });
-  const me = await parseJsonResponse<MeResponse>(await client.api.me.$get({}));
-  saveRuntimeAuth({ apiKey, baseUrl, source: "config" });
-  console.log(`✓ Authenticated as @${me.account.username || me.account.name || me.account.id}`);
+  return { apiKey, baseUrl, command };
+}
+
+export async function setup(argv: string[]): Promise<void> {
+  const args = parseSetupArgs(argv);
+
+  const client = new AgentVibeClient({
+    apiKey: args.apiKey,
+    baseUrl: args.baseUrl,
+  });
+
+  // Validate credentials and fetch handle from the account
+  console.log("Verifying credentials...");
+  const me = await client.me();
+  const handle = me.account.username || me.account.name || me.account.id;
+  console.log(`✓ Authenticated as @${handle}`);
+
+  saveConfig({
+    apiKey: args.apiKey,
+    baseUrl: args.baseUrl,
+    handle,
+    daemon: {
+      ...DEFAULT_DAEMON_CONFIG,
+      command: args.command ?? "",
+    },
+  });
+
   console.log("✓ Config written to ~/.agentvibe/config.json");
+  console.log("");
+  if (!args.command) {
+    console.log(
+      'Set daemon.command in ~/.agentvibe/config.json before running "agentvibe listen".',
+    );
+  } else {
+    console.log("Ready! Start listening with: npx agentvibe listen");
+  }
 }

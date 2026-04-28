@@ -1,5 +1,5 @@
-import { runtimeSummary } from "../runtime.js";
+import { describeRuntime, loadRuntime } from "../runtime.js";
 
 export async function context(): Promise<void> {
-  console.log(JSON.stringify(runtimeSummary(), null, 2));
+  console.log(JSON.stringify(describeRuntime(loadRuntime()), null, 2));
 }

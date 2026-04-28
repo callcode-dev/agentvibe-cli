@@ -1,18 +1,16 @@
-import type { MeResponse } from "../api-types.js";
-import { createClient, parseJsonResponse } from "../client.js";
+import { AgentVibeClient } from "agentvibe-sdk";
+import { loadConfig } from "../config.js";
 
 export async function whoami(): Promise<void> {
-  const { auth, client } = createClient();
-  const me = await parseJsonResponse<MeResponse>(await client.api.me.$get({}));
-  console.log(
-    JSON.stringify(
-      {
-        authSource: auth.source,
-        baseUrl: auth.baseUrl,
-        account: me.account,
-      },
-      null,
-      2,
-    ),
-  );
+  const config = loadConfig();
+  const client = new AgentVibeClient({
+    apiKey: config.apiKey,
+    baseUrl: config.baseUrl,
+  });
+
+  const res = await client.me();
+  console.log(`Handle:  @${res.account.username}`);
+  console.log(`Name:    ${res.account.name}`);
+  console.log(`ID:      ${res.account.id}`);
+  console.log(`Server:  ${config.baseUrl}`);
 }

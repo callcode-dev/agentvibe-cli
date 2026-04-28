@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { homedir } from "node:os";
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
+import { loadConfig, type CliConfig } from "./config.js";
 
 export type RuntimeTarget =
   | {
@@ -21,7 +22,11 @@ export interface RuntimeIdentity {
 }
 
 export interface AgentVibeRuntimeConfig {
-  org?: { id?: string; name?: string; slug?: string };
+  org?: {
+    id?: string;
+    name?: string;
+    slug?: string;
+  };
   currentIdentity?: RuntimeIdentity;
   defaultSlackAppId?: string;
   channels?: Record<string, RuntimeTarget>;
@@ -32,62 +37,49 @@ export interface AgentVibeRuntimeConfig {
 export interface RuntimeAuth {
   apiKey: string;
   baseUrl: string;
-  source: "env" | "config" | "auth";
+  source: "env" | "config";
+  config?: CliConfig;
 }
 
-const CONFIG_PATH = join(homedir(), ".agentvibe", "config.json");
-const AUTH_PATH = join(homedir(), ".agentvibe", "auth.json");
-const RUNTIME_PATH = join(homedir(), ".agentvibe", "runtime.json");
-
-type AuthFile = { apiKey?: string; baseUrl?: string; apiBaseUrl?: string };
-
-function readJson<T>(path: string): T | null {
-  if (!existsSync(path)) return null;
-  return JSON.parse(readFileSync(path, "utf-8")) as T;
+export interface LoadedRuntime {
+  auth: RuntimeAuth;
+  context: AgentVibeRuntimeConfig;
+  contextSource: "env" | "file" | "none";
 }
+
+const DEFAULT_RUNTIME_PATH = join(homedir(), ".agentvibe", "runtime.json");
+const DEFAULT_CONFIG_PATH = join(homedir(), ".agentvibe", "config.json");
 
 export function loadRuntimeAuth(): RuntimeAuth {
   const apiKey = process.env.AGENTVIBE_API_KEY;
   const baseUrl = process.env.AGENTVIBE_API_BASE_URL ?? process.env.AGENTVIBE_BASE_URL;
   if (apiKey && baseUrl) return { apiKey, baseUrl, source: "env" };
 
-  const config = readJson<AuthFile>(CONFIG_PATH);
-  if (config?.apiKey && (config.baseUrl ?? config.apiBaseUrl)) {
-    return {
-      apiKey: config.apiKey,
-      baseUrl: config.baseUrl ?? config.apiBaseUrl ?? "",
-      source: "config",
-    };
-  }
-
-  const auth = readJson<AuthFile>(AUTH_PATH);
-  if (auth?.apiKey && (auth.baseUrl ?? auth.apiBaseUrl)) {
-    return { apiKey: auth.apiKey, baseUrl: auth.baseUrl ?? auth.apiBaseUrl ?? "", source: "auth" };
-  }
-
-  throw new Error(
-    "Missing AgentVibe auth. Set AGENTVIBE_API_KEY and AGENTVIBE_API_BASE_URL, or run agentvibe setup.",
-  );
+  const config = loadConfig(DEFAULT_CONFIG_PATH);
+  return { apiKey: config.apiKey, baseUrl: config.baseUrl, source: "config", config };
 }
 
-export function saveRuntimeAuth(auth: RuntimeAuth): void {
-  mkdirSync(dirname(CONFIG_PATH), { recursive: true });
-  writeFileSync(
-    CONFIG_PATH,
-    JSON.stringify({ apiKey: auth.apiKey, baseUrl: auth.baseUrl }, null, 2) + "\n",
-    { mode: 0o600 },
-  );
-}
-
-export function loadRuntimeContext(): {
+export function loadRuntimeContext(path = DEFAULT_RUNTIME_PATH): {
   context: AgentVibeRuntimeConfig;
   source: "env" | "file" | "none";
 } {
-  const raw = process.env.AGENTVIBE_CONTEXT_JSON ?? process.env.AGENTVIBE_RUNTIME_JSON;
-  if (raw) return { context: JSON.parse(raw) as AgentVibeRuntimeConfig, source: "env" };
-  const fileContext = readJson<AgentVibeRuntimeConfig>(RUNTIME_PATH);
-  if (fileContext) return { context: fileContext, source: "file" };
+  const rawEnv = process.env.AGENTVIBE_CONTEXT_JSON ?? process.env.AGENTVIBE_RUNTIME_JSON;
+  if (rawEnv) return { context: JSON.parse(rawEnv) as AgentVibeRuntimeConfig, source: "env" };
+
+  if (existsSync(path)) {
+    return {
+      context: JSON.parse(readFileSync(path, "utf-8")) as AgentVibeRuntimeConfig,
+      source: "file",
+    };
+  }
+
   return { context: {}, source: "none" };
+}
+
+export function loadRuntime(): LoadedRuntime {
+  const auth = loadRuntimeAuth();
+  const { context, source } = loadRuntimeContext();
+  return { auth, context, contextSource: source };
 }
 
 function normalizeName(value: string): string {
@@ -122,21 +114,14 @@ export function resolveRuntimeTarget(
   return null;
 }
 
-export function runtimeSummary(): Record<string, unknown> {
-  const { context, source } = loadRuntimeContext();
-  let auth: Pick<RuntimeAuth, "baseUrl" | "source"> | null = null;
-  try {
-    const loaded = loadRuntimeAuth();
-    auth = { baseUrl: loaded.baseUrl, source: loaded.source };
-  } catch {
-    auth = null;
-  }
+export function describeRuntime(runtime: LoadedRuntime): Record<string, unknown> {
   return {
-    auth,
-    contextSource: source,
-    org: context.org ?? null,
-    currentIdentity: context.currentIdentity ?? null,
-    channels: Object.keys(context.channels ?? {}),
-    targets: Object.keys(context.targets ?? {}),
+    authSource: runtime.auth.source,
+    baseUrl: runtime.auth.baseUrl,
+    contextSource: runtime.contextSource,
+    org: runtime.context.org ?? null,
+    currentIdentity: runtime.context.currentIdentity ?? null,
+    channels: Object.keys(runtime.context.channels ?? {}),
+    targets: Object.keys(runtime.context.targets ?? {}),
   };
 }

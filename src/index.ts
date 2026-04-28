@@ -1,41 +1,39 @@
 #!/usr/bin/env node
+
+import { whoami } from "./commands/whoami.js";
+import { setup } from "./commands/setup.js";
+import { send } from "./commands/send.js";
+import { listen } from "./commands/listen.js";
+import { chat } from "./commands/chat.js";
+import { requests } from "./commands/requests.js";
 import { context } from "./commands/context.js";
 import { message } from "./commands/message.js";
 import { resolve } from "./commands/resolve.js";
-import { setup } from "./commands/setup.js";
-import { whoami } from "./commands/whoami.js";
+import { admin } from "./commands/admin.js";
 
-const command = process.argv[2];
-const commandArgs = process.argv.slice(3);
+const invokedAs = process.argv[1]?.split(/[\\/]/).pop();
+const command = invokedAs === "ava" ? "admin" : process.argv[2];
+const commandArgs = invokedAs === "ava" ? process.argv.slice(2) : process.argv.slice(3);
 
-function printHelp(): void {
-  console.log(`Usage: agentvibe <command>
-
-Commands:
-  setup     Configure local AgentVibe credentials
-  context   Print AgentVibe runtime context summary
-  resolve   Resolve a person, agent, or channel from runtime context
-  message   Route a message to a resolved person, agent, or channel
-  whoami    Print current AgentVibe identity
-
-Examples:
-  agentvibe context
-  agentvibe resolve "tanay clone"
-  agentvibe message "tanay clone" "please set up Convex alerts"
-  agentvibe message --dry-run "#ci-cd" "deploy failed"
-`);
-}
-
-async function main(): Promise<void> {
+async function main() {
   switch (command) {
-    case undefined:
-    case "--help":
-    case "-h":
-    case "help":
-      printHelp();
+    case "whoami":
+      await whoami();
       break;
     case "setup":
       await setup(commandArgs);
+      break;
+    case "listen":
+      await listen(commandArgs);
+      break;
+    case "send":
+      await send(commandArgs);
+      break;
+    case "chat":
+      await chat(commandArgs);
+      break;
+    case "requests":
+      await requests(commandArgs);
       break;
     case "context":
       await context();
@@ -46,17 +44,30 @@ async function main(): Promise<void> {
     case "message":
       await message(commandArgs);
       break;
-    case "whoami":
-      await whoami();
+    case "admin":
+      await admin(commandArgs);
       break;
     default:
-      console.error(`Unknown command: ${command}\n`);
-      printHelp();
-      process.exit(1);
+      console.error(
+        `Usage: agentvibe <command>
+
+Commands:
+  setup     Configure agentvibe credentials
+  listen    Start the polling daemon
+  send      Send a message to a chat
+  chat      Start a DM or send a friend request to a handle
+  requests  Manage outgoing DM requests (cancel / list)
+  context   Print AgentVibe runtime context
+  resolve   Resolve a person, agent, or channel from runtime context
+  message   Route a message to a resolved person, agent, or channel
+  whoami    Print current identity
+  admin     Internal admin/debug tools (also installed as ava)`,
+      );
+      process.exit(command ? 1 : 0);
   }
 }
 
-main().catch((err: unknown) => {
-  console.error(err instanceof Error ? err.message : String(err));
+main().catch((err) => {
+  console.error(err.message ?? err);
   process.exit(1);
 });
