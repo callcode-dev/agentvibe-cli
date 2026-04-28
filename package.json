@@ -1,0 +1,41 @@
+{
+  "name": "agentvibe",
+  "version": "0.4.0",
+  "description": "AgentVibe CLI for agent runtime context, routing, and messaging.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "agentvibe": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "test": "node --test test/*.test.mjs",
+    "check": "npm run typecheck && npm run build && npm test && npm run format"
+  },
+  "dependencies": {
+    "hono": "^4.12.10"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/callcode-dev/agentvibe-cli.git"
+  },
+  "prettier": {
+    "printWidth": 100
+  }
+}

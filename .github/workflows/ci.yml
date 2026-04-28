@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci
+      - run: npm run check
+      - name: Smoke test CLI
+        run: |
+          node dist/index.js --help
+          node dist/index.js context
+          AGENTVIBE_CONTEXT_JSON='{"channels":{"agents":{"type":"slack-channel","channel":"C123"}},"targets":{"tanay":{"type":"slack-user","slackUserId":"U123","defaultChannel":"agents"}},"defaultSlackAppId":"A123"}' node dist/index.js message --dry-run tanay hello
