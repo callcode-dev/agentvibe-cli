@@ -1,6 +1,11 @@
 import { AgentVibeClient, type Part, type ProactiveSendTarget } from "agentvibe-sdk";
 import { handleQuotaError } from "../lib/handleQuotaError.js";
-import { loadRuntime, resolveRuntimeTarget, type RuntimeTarget } from "../runtime.js";
+import {
+  loadRuntimeAuth,
+  loadRuntimeContext,
+  resolveRuntimeTarget,
+  type RuntimeTarget,
+} from "../runtime.js";
 
 function readOption(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -45,8 +50,8 @@ export async function message(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const runtime = loadRuntime();
-  const resolved = resolveRuntimeTarget(targetName, runtime.context);
+  const { context } = loadRuntimeContext();
+  const resolved = resolveRuntimeTarget(targetName, context);
   if (!resolved) {
     console.error(`Could not resolve ${JSON.stringify(targetName)} from AgentVibe runtime context`);
     process.exit(1);
@@ -57,7 +62,7 @@ export async function message(argv: string[]): Promise<void> {
 
   if (target.type === "slack-user" && (channelOverride || target.defaultChannel)) {
     const channelName = channelOverride ?? target.defaultChannel;
-    const channel = channelName ? resolveRuntimeTarget(channelName, runtime.context) : null;
+    const channel = channelName ? resolveRuntimeTarget(channelName, context) : null;
     if (!channel || channel.target.type !== "slack-channel") {
       throw new Error(`Could not resolve Slack channel ${JSON.stringify(channelName)}`);
     }
@@ -65,16 +70,17 @@ export async function message(argv: string[]): Promise<void> {
     target = channel.target;
   }
 
-  const deliveryTarget = slackTarget(target, runtime.context.defaultSlackAppId);
+  const deliveryTarget = slackTarget(target, context.defaultSlackAppId);
 
   if (dryRun) {
     console.log(JSON.stringify({ target: deliveryTarget, parts }, null, 2));
     return;
   }
 
+  const auth = loadRuntimeAuth();
   const client = new AgentVibeClient({
-    apiKey: runtime.auth.apiKey,
-    baseUrl: runtime.auth.baseUrl,
+    apiKey: auth.apiKey,
+    baseUrl: auth.baseUrl,
   });
   try {
     if (deliveryTarget.type === "agentvibe-chat") {
