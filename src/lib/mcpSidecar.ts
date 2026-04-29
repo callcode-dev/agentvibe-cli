@@ -22,16 +22,17 @@ export interface McpSidecarOptions {
   apiKey: string;
   baseUrl: string;
   /**
-   * Optional override for the MCP server binary. Defaults to invoking the
-   * workspace `agentvibe-mcp` bin via `bunx`. Override in tests or when the
-   * package isn't on PATH.
+   * Optional override for the MCP server binary. Defaults to the
+   * `agentvibe-mcp-server` bin shipped by this same npm package, which lands
+   * on PATH automatically when `agentvibe` is installed globally. Override in
+   * tests or when the bin needs to be invoked from a non-standard location.
    */
   command?: string;
   args?: string[];
 }
 
-const DEFAULT_COMMAND = "bunx";
-const DEFAULT_ARGS = ["agentvibe-mcp-server"];
+const DEFAULT_COMMAND = "agentvibe-mcp-server";
+const DEFAULT_ARGS: string[] = [];
 
 /**
  * Materialize a Claude `--mcp-config` JSON file for the agentvibe MCP
