@@ -15,7 +15,7 @@ const DEFAULT_RUNTIME_CONTEXT_PATH = join(homedir(), ".agentvibe", "runtime-cont
 function usage(): never {
   console.error(`Usage:
   agentvibe slack send <target> <text>
-  agentvibe slack channels [--limit <n>] [--json]
+  agentvibe slack channels [--limit <n>] [--types <types>] [--json]
   agentvibe slack history <channel|alias> [--limit <n>] [--json]
   agentvibe slack thread <permalink> [--limit <n>] [--json]
   agentvibe slack thread --channel <channel|alias> --ts <threadTs> [--limit <n>] [--json]
@@ -94,8 +94,16 @@ async function slackApi<T>(method: string, params: Record<string, string | numbe
     },
     body,
   });
-  const data = (await res.json()) as T & { ok?: boolean; error?: string };
-  if (!data.ok) throw new Error(`Slack ${method} failed: ${data.error ?? res.status}`);
+  const data = (await res.json()) as T & {
+    ok?: boolean;
+    error?: string;
+    needed?: string;
+    provided?: string;
+  };
+  if (!data.ok) {
+    const scopeHint = data.needed ? ` needed=${data.needed}` : "";
+    throw new Error(`Slack ${method} failed: ${data.error ?? res.status}${scopeHint}`);
+  }
   return data;
 }
 
@@ -170,6 +178,7 @@ export async function slack(argv: string[]): Promise<void> {
   if (subcommand === "channels") {
     const json = takeBooleanFlag(argv, "--json");
     const limit = takeLimit(argv, 100);
+    const types = takeFlag(argv, "--types") ?? "public_channel,private_channel,im";
     if (argv.length > 0) usage();
     const data = await slackApi<{
       channels?: Array<{
@@ -180,7 +189,7 @@ export async function slack(argv: string[]): Promise<void> {
         is_group?: boolean;
       }>;
     }>("conversations.list", {
-      types: "public_channel,private_channel,mpim,im",
+      types,
       exclude_archived: "true",
       limit,
     });
