@@ -7,6 +7,7 @@ agentvibe context
 agentvibe resolve "tanay clone"
 agentvibe message "tanay clone" "please set up Convex alerts"
 agentvibe message "#ci-cd" "deploy failed"
+agentvibe slack send tanay-agent "please review this PR"
 ```
 
 ## Runtime context
@@ -51,5 +52,13 @@ The file is deep-merged over the server runtime context, so it can add friendly 
 ```
 
 Set `AGENTVIBE_RUNTIME_CONTEXT_PATH` to use a different file, or `AGENTVIBE_RUNTIME_CONTEXT_JSON` to provide inline JSON.
+
+The CLI can also write that override file for Slack routing:
+
+```bash
+agentvibe slack channel add agents --channel C123 --app A123
+agentvibe slack user add tanay-agent --user U123 --channel agents --label "Tanay (clone)" --alias tanay-clone
+agentvibe slack send tanay-agent "please review this PR"
+```
 
 Use `--dry-run` to inspect a routed message without sending it.
