@@ -10,6 +10,7 @@ import { context } from "./commands/context.js";
 import { message } from "./commands/message.js";
 import { resolve } from "./commands/resolve.js";
 import { admin } from "./commands/admin.js";
+import { slack } from "./commands/slack.js";
 
 const invokedAs = process.argv[1]?.split(/[\\/]/).pop();
 const command = invokedAs === "ava" ? "admin" : process.argv[2];
@@ -28,6 +29,7 @@ Commands:
   context   Print AgentVibe runtime context
   resolve   Resolve a person, agent, or channel from runtime context
   message   Route a message to a resolved person, agent, or channel
+  slack     Configure Slack aliases and send Slack-routed messages
   whoami    Print current identity
   admin     Internal admin/debug tools (also installed as ava)`,
   );
@@ -67,6 +69,9 @@ async function main() {
       break;
     case "message":
       await message(commandArgs);
+      break;
+    case "slack":
+      await slack(commandArgs);
       break;
     case "admin":
       await admin(commandArgs);

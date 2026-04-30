@@ -54,6 +54,7 @@ async function cli(args, baseUrl, extraEnv = {}) {
       ...process.env,
       AGENTVIBE_API_KEY: "test-key",
       AGENTVIBE_API_BASE_URL: baseUrl,
+      AGENTVIBE_RUNTIME_CONTEXT_PATH: join(tmpdir(), "agentvibe-test-missing-runtime-context.json"),
       ...extraEnv,
     },
     encoding: "utf8",
@@ -114,6 +115,46 @@ test("runtime context overrides add local aliases and channels", async () => {
     assert.deepEqual(routed.target, {
       type: "slack-channel",
       appId: "A123",
+      channel: "CLOCALAGENTS",
+    });
+    assert.equal(routed.parts[0].text, "<@ULOCALCLONE> please review");
+  });
+});
+
+test("slack commands write aliases and send through message routing", async () => {
+  await withServer(async (baseUrl) => {
+    const dir = await mkdtemp(join(tmpdir(), "agentvibe-slack-"));
+    const overridePath = join(dir, "runtime-context.json");
+    const env = { AGENTVIBE_RUNTIME_CONTEXT_PATH: overridePath };
+
+    await cli(
+      ["slack", "channel", "add", "agents", "--channel", "CLOCALAGENTS", "--app", "ALOCAL"],
+      baseUrl,
+      env,
+    );
+    await cli(
+      [
+        "slack",
+        "user",
+        "add",
+        "tanay-agent",
+        "--user",
+        "ULOCALCLONE",
+        "--channel",
+        "agents",
+        "--alias",
+        "tanay-clone",
+      ],
+      baseUrl,
+      env,
+    );
+
+    const routed = JSON.parse(
+      await cli(["slack", "send", "--dry-run", "tanay-agent", "please", "review"], baseUrl, env),
+    );
+    assert.deepEqual(routed.target, {
+      type: "slack-channel",
+      appId: "ALOCAL",
       channel: "CLOCALAGENTS",
     });
     assert.equal(routed.parts[0].text, "<@ULOCALCLONE> please review");
