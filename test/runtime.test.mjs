@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import http from "node:http";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const execFileAsync = promisify(execFile);
 
@@ -45,12 +48,13 @@ async function withServer(fn) {
   }
 }
 
-async function cli(args, baseUrl) {
+async function cli(args, baseUrl, extraEnv = {}) {
   const { stdout } = await execFileAsync(process.execPath, ["dist/index.js", ...args], {
     env: {
       ...process.env,
       AGENTVIBE_API_KEY: "test-key",
       AGENTVIBE_API_BASE_URL: baseUrl,
+      ...extraEnv,
     },
     encoding: "utf8",
     timeout: 5000,
@@ -77,5 +81,41 @@ test("message dry-run routes user targets through default channel mentions", asy
       channel: "C0B0F13M8R0",
     });
     assert.equal(routed.parts[0].text, "<@U0B0BLLQDCH> please review");
+  });
+});
+
+test("runtime context overrides add local aliases and channels", async () => {
+  await withServer(async (baseUrl) => {
+    const dir = await mkdtemp(join(tmpdir(), "agentvibe-runtime-"));
+    const overridePath = join(dir, "runtime-context.json");
+    await writeFile(
+      overridePath,
+      JSON.stringify({
+        channels: {
+          agents: { type: "slack-channel", channel: "CLOCALAGENTS", label: "agents" },
+        },
+        targets: {
+          "tanays-agent": {
+            type: "slack-user",
+            slackUserId: "ULOCALCLONE",
+            label: "Tanay (clone)",
+            defaultChannel: "agents",
+          },
+        },
+        aliases: { "tanay-agent": "tanays-agent" },
+      }),
+    );
+
+    const routed = JSON.parse(
+      await cli(["message", "--dry-run", "tanay-agent", "please", "review"], baseUrl, {
+        AGENTVIBE_RUNTIME_CONTEXT_PATH: overridePath,
+      }),
+    );
+    assert.deepEqual(routed.target, {
+      type: "slack-channel",
+      appId: "A123",
+      channel: "CLOCALAGENTS",
+    });
+    assert.equal(routed.parts[0].text, "<@ULOCALCLONE> please review");
   });
 });

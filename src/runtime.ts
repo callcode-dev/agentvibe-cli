@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { loadConfig, type CliConfig } from "./config.js";
@@ -47,6 +48,7 @@ export interface LoadedRuntime {
 }
 
 const DEFAULT_CONFIG_PATH = join(homedir(), ".agentvibe", "config.json");
+const DEFAULT_RUNTIME_CONTEXT_PATH = join(homedir(), ".agentvibe", "runtime-context.json");
 
 export function loadRuntimeAuth(): RuntimeAuth {
   const apiKey = process.env.AGENTVIBE_API_KEY;
@@ -55,6 +57,30 @@ export function loadRuntimeAuth(): RuntimeAuth {
 
   const config = loadConfig(DEFAULT_CONFIG_PATH);
   return { apiKey: config.apiKey, baseUrl: config.baseUrl, source: "config", config };
+}
+
+function mergeRuntimeContext(
+  base: AgentVibeRuntimeConfig,
+  override: AgentVibeRuntimeConfig,
+): AgentVibeRuntimeConfig {
+  return {
+    ...base,
+    ...override,
+    org: { ...(base.org ?? {}), ...(override.org ?? {}) },
+    currentIdentity: override.currentIdentity ?? base.currentIdentity,
+    channels: { ...(base.channels ?? {}), ...(override.channels ?? {}) },
+    targets: { ...(base.targets ?? {}), ...(override.targets ?? {}) },
+    aliases: { ...(base.aliases ?? {}), ...(override.aliases ?? {}) },
+  };
+}
+
+function loadRuntimeContextOverride(): AgentVibeRuntimeConfig | null {
+  const inline = process.env.AGENTVIBE_RUNTIME_CONTEXT_JSON;
+  if (inline) return JSON.parse(inline) as AgentVibeRuntimeConfig;
+
+  const path = process.env.AGENTVIBE_RUNTIME_CONTEXT_PATH ?? DEFAULT_RUNTIME_CONTEXT_PATH;
+  if (!existsSync(path)) return null;
+  return JSON.parse(readFileSync(path, "utf-8")) as AgentVibeRuntimeConfig;
 }
 
 export async function fetchRuntimeContext(
@@ -66,7 +92,9 @@ export async function fetchRuntimeContext(
     const body = await res.text().catch(() => "");
     throw new Error(`Failed to fetch AgentVibe runtime context (${res.status}): ${body}`);
   }
-  return (await res.json()) as AgentVibeRuntimeConfig;
+  const context = (await res.json()) as AgentVibeRuntimeConfig;
+  const override = loadRuntimeContextOverride();
+  return override ? mergeRuntimeContext(context, override) : context;
 }
 
 export async function loadRuntime(): Promise<LoadedRuntime> {

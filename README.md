@@ -31,4 +31,25 @@ agentvibe setup --api-key <key> --base-url <url>
 
 This writes `~/.agentvibe/config.json`, which the CLI uses when env vars are not set.
 
+Local environments can also add machine-specific routing aliases in `~/.agentvibe/runtime-context.json`.
+The file is deep-merged over the server runtime context, so it can add friendly channel names or aliases without changing server state:
+
+```json
+{
+  "channels": {
+    "agents": { "type": "slack-channel", "channel": "C123", "label": "agents" }
+  },
+  "targets": {
+    "tanay-clone": {
+      "type": "slack-user",
+      "slackUserId": "U123",
+      "label": "Tanay (clone)",
+      "defaultChannel": "agents"
+    }
+  }
+}
+```
+
+Set `AGENTVIBE_RUNTIME_CONTEXT_PATH` to use a different file, or `AGENTVIBE_RUNTIME_CONTEXT_JSON` to provide inline JSON.
+
 Use `--dry-run` to inspect a routed message without sending it.
