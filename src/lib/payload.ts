@@ -14,6 +14,13 @@ export type PayloadPart =
     };
 
 export interface PayloadMessage {
+  /**
+   * Convex message id (`Id<"messages">` shape). Forwarded so agents can
+   * reference the message in callbacks — e.g. the digital-clone handler
+   * uses the most recent newMessages[].id as the messageId argument to
+   * `agentvibe status` so the right slack placeholder gets edited.
+   */
+  id: string;
   from: { handle: string; name: string; isYou?: boolean };
   parts: PayloadPart[];
   createdAt: number;
@@ -76,6 +83,7 @@ function toPayloadMessage(
     if (mapped) parts.push(mapped);
   }
   return {
+    id: msg.id,
     from: {
       handle: msg.from?.username ?? "system",
       name: msg.from?.name ?? "System",
