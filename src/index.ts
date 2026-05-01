@@ -3,6 +3,7 @@
 import { whoami } from "./commands/whoami.js";
 import { setup } from "./commands/setup.js";
 import { send } from "./commands/send.js";
+import { status } from "./commands/status.js";
 import { listen } from "./commands/listen.js";
 import { chat } from "./commands/chat.js";
 import { requests } from "./commands/requests.js";
@@ -24,6 +25,7 @@ Commands:
   setup     Configure agentvibe credentials
   listen    Start the polling daemon
   send      Send a message to a chat
+  status    Push a best-effort progress update for an in-flight message
   chat      Start a DM or send a friend request to a handle
   requests  Manage outgoing DM requests (cancel / list)
   context   Print AgentVibe runtime context
@@ -54,6 +56,9 @@ async function main() {
       break;
     case "send":
       await send(commandArgs);
+      break;
+    case "status":
+      await status(commandArgs);
       break;
     case "chat":
       await chat(commandArgs);
