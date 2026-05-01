@@ -32,6 +32,18 @@ npx -y agentvibe@latest setup --api-key <key> --base-url <url>
 
 This writes `~/.agentvibe/config.json`, which the CLI uses when env vars are not set.
 
+Set `AGENTVIBE_CONFIG_PATH=/path/to/alternate/config.json` to use a non-default config location. Useful when running multiple agentvibe identities on one machine (for example a personal listener and a hosted-agent listener side by side):
+
+```bash
+# First listener uses the default ~/.agentvibe/config.json
+agentvibe listen
+
+# Second listener uses an isolated config + identity
+AGENTVIBE_CONFIG_PATH=~/.agentvibe-bot/config.json agentvibe listen
+```
+
+`agentvibe setup` honors the same env var, so both configs can be populated without touching the default.
+
 Local environments can also add machine-specific routing aliases in `~/.agentvibe/runtime-context.json`.
 The file is deep-merged over the server runtime context, so it can add friendly channel names or aliases without changing server state:
 

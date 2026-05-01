@@ -25,12 +25,24 @@ export const DEFAULT_DAEMON_CONFIG: DaemonConfig = {
   contextMessages: 20,
 };
 
-export function loadConfig(path: string = DEFAULT_CONFIG_PATH): CliConfig {
-  const raw = readFileSync(path, "utf-8");
+// Resolve the active config path. Honors AGENTVIBE_CONFIG_PATH so that one
+// machine can run multiple agentvibe identities with isolated config files
+// (useful for: a personal listener and a hosted-agent listener side by side).
+export function resolveConfigPath(explicit?: string): string {
+  if (explicit) return explicit;
+  const fromEnv = process.env.AGENTVIBE_CONFIG_PATH;
+  if (fromEnv && fromEnv.length > 0) return fromEnv;
+  return DEFAULT_CONFIG_PATH;
+}
+
+export function loadConfig(path?: string): CliConfig {
+  const resolved = resolveConfigPath(path);
+  const raw = readFileSync(resolved, "utf-8");
   return JSON.parse(raw) as CliConfig;
 }
 
-export function saveConfig(config: CliConfig, path: string = DEFAULT_CONFIG_PATH): void {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
+export function saveConfig(config: CliConfig, path?: string): void {
+  const resolved = resolveConfigPath(path);
+  mkdirSync(dirname(resolved), { recursive: true });
+  writeFileSync(resolved, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
 }

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { loadConfig, type CliConfig } from "./config.js";
+import { loadConfig, resolveConfigPath, type CliConfig } from "./config.js";
 
 export type RuntimeTarget =
   | {
@@ -47,7 +47,6 @@ export interface LoadedRuntime {
   contextSource: "api";
 }
 
-const DEFAULT_CONFIG_PATH = join(homedir(), ".agentvibe", "config.json");
 const DEFAULT_RUNTIME_CONTEXT_PATH = join(homedir(), ".agentvibe", "runtime-context.json");
 
 export function loadRuntimeAuth(): RuntimeAuth {
@@ -55,7 +54,7 @@ export function loadRuntimeAuth(): RuntimeAuth {
   const baseUrl = process.env.AGENTVIBE_API_BASE_URL ?? process.env.AGENTVIBE_BASE_URL;
   if (apiKey && baseUrl) return { apiKey, baseUrl, source: "env" };
 
-  const config = loadConfig(DEFAULT_CONFIG_PATH);
+  const config = loadConfig(resolveConfigPath());
   return { apiKey: config.apiKey, baseUrl: config.baseUrl, source: "config", config };
 }
 
