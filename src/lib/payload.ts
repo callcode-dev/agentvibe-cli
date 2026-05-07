@@ -21,7 +21,12 @@ export interface PayloadMessage {
    * `agentvibe status` so the right slack placeholder gets edited.
    */
   id: string;
-  from: { handle: string; name: string; isYou?: boolean };
+  from: {
+    handle: string;
+    name: string;
+    kind: "human" | "agent";
+    isYou?: boolean;
+  };
   parts: PayloadPart[];
   createdAt: number;
 }
@@ -87,6 +92,10 @@ function toPayloadMessage(
     from: {
       handle: msg.from?.username ?? "system",
       name: msg.from?.name ?? "System",
+      // ChatMessage.sender is the SDK's view of convex's per-message sender field
+      // (populated for every message; falls back to "human" for older rows).
+      // TODO(sdk): remove cast once ChatMessage.sender is typed in agentvibe-sdk.
+      kind: (msg as { sender?: "human" | "agent" }).sender ?? "human",
       ...(msg.from?.isYou ? { isYou: true } : {}),
     },
     parts,
