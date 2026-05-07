@@ -1,4 +1,5 @@
 import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { AgentVibeClient } from "agentvibe-sdk";
@@ -10,6 +11,7 @@ import { withTypingIndicator } from "../lib/withTypingIndicator.js";
 import { handleQuotaError } from "../lib/handleQuotaError.js";
 import { buildMcpSidecar, type McpSidecarHandle } from "../lib/mcpSidecar.js";
 import { materializeFiles } from "../lib/files.js";
+import { readResponseFile } from "../lib/responseFile.js";
 
 // Keep in sync with TYPING_TTL_MS in convex/lib/typing.ts — the typing
 // indicator TTL must be >= this timeout so a live subprocess is never
@@ -38,13 +40,20 @@ export async function listen(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
+  const responseDir = mkdtempSync(path.join(tmpdir(), "agentvibe-responses-"));
+  console.log(`Response dir: ${responseDir}`);
+
   // Materialize the MCP sidecar config once per `listen` lifetime. The agent
   // runtime forks the actual MCP server process via the config's `command` —
   // we don't fork it ourselves. If --no-mcp is set, the spawn falls back to
   // pre-injected context only.
   const mcpSidecar: McpSidecarHandle | null = noMcp
     ? null
-    : buildMcpSidecar({ apiKey: config.apiKey, baseUrl: config.baseUrl });
+    : buildMcpSidecar({
+        apiKey: config.apiKey,
+        baseUrl: config.baseUrl,
+        responseDir,
+      });
 
   // Auto-inject `--mcp-config <path>` for claude-flavored commands so the
   // common case Just Works. Other runtimes get the config path via env vars
@@ -73,6 +82,11 @@ export async function listen(argv: string[]): Promise<void> {
 
   const cleanup = (): void => {
     if (mcpSidecar) mcpSidecar.cleanup();
+    try {
+      rmSync(responseDir, { recursive: true, force: true });
+    } catch {
+      // best-effort
+    }
   };
 
   const activeChats = new Set<string>();
@@ -94,6 +108,7 @@ export async function listen(argv: string[]): Promise<void> {
     activeChats.add(chatId);
 
     let filesDir: string | null = null;
+    const responseFile = path.join(responseDir, `${chatId}.json`);
     try {
       // Ensure we have chat metadata
       if (!chatMap.has(chatId)) {
@@ -143,6 +158,8 @@ export async function listen(argv: string[]): Promise<void> {
       // a per-invocation tmpdir, so the spawned daemon can read them directly
       // without needing agentvibe API credentials.
       filesDir = await mkdtemp(path.join(tmpdir(), `agentvibe-files-${chatId}-`));
+      // Best-effort: clear any stale file from a previous spawn for this chat.
+      await rm(responseFile, { force: true }).catch(() => {});
       const materialized = await materializeFiles({
         client,
         chatId,
@@ -165,7 +182,12 @@ export async function listen(argv: string[]): Promise<void> {
         `[${new Date().toISOString()}] New message in "${payload.chatName}" from ${from}`,
       );
 
-      const spawnEnv: Record<string, string> = { AGENTVIBE_FILES_DIR: filesDir };
+      const spawnEnv: Record<string, string> = {
+        AGENTVIBE_FILES_DIR: filesDir,
+        AGENTVIBE_RESPONSE_DIR: responseDir,
+        AGENTVIBE_RESPONSE_FILE: responseFile,
+        AGENTVIBE_CHAT_ID: chatId,
+      };
       if (mcpSidecar) {
         Object.assign(spawnEnv, mcpSidecar.env, {
           AGENTVIBE_MCP_CONFIG: mcpSidecar.configPath,
@@ -194,6 +216,35 @@ export async function listen(argv: string[]): Promise<void> {
           return;
         }
 
+        const envelope = await readResponseFile(responseFile);
+
+        if (envelope?.mode === "silence") {
+          console.log(
+            `[${new Date().toISOString()}] Silence requested for "${payload.chatName}" — no reply sent.`,
+          );
+          return;
+        }
+
+        if (envelope?.mode === "respond") {
+          // TODO(sdk): when agentvibe-sdk ships SendOptions, drop the cast and pass
+          // { quiet: true } directly to client.send.
+          type SendWithOpts = (
+            chatId: string,
+            text: string,
+            opts?: { quiet?: boolean },
+          ) => Promise<unknown>;
+          await (client.send as SendWithOpts)(
+            chatId,
+            envelope.text,
+            envelope.quiet ? { quiet: true } : undefined,
+          );
+          console.log(
+            `[${new Date().toISOString()}] Sent ${envelope.quiet ? "quiet " : ""}response to "${payload.chatName}" (${envelope.text.length} chars)`,
+          );
+          return;
+        }
+
+        // Backwards compat: no envelope → use stdout.
         const response = result.stdout.trim();
         if (response) {
           await client.send(chatId, response);
@@ -220,6 +271,7 @@ export async function listen(argv: string[]): Promise<void> {
           );
         });
       }
+      await rm(responseFile, { force: true }).catch(() => {});
       activeChats.delete(chatId);
     }
   }

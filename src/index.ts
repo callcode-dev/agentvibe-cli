@@ -12,6 +12,8 @@ import { message } from "./commands/message.js";
 import { resolve } from "./commands/resolve.js";
 import { admin } from "./commands/admin.js";
 import { slack } from "./commands/slack.js";
+import { respond } from "./commands/respond.js";
+import { silence } from "./commands/silence.js";
 
 const invokedAs = process.argv[1]?.split(/[\\/]/).pop();
 const command = invokedAs === "ava" ? "admin" : process.argv[2];
@@ -33,7 +35,33 @@ Commands:
   message   Route a message to a resolved person, agent, or channel
   slack     Configure Slack aliases and send Slack-routed messages
   whoami    Print current identity
-  admin     Internal admin/debug tools (also installed as ava)`,
+  admin     Internal admin/debug tools (also installed as ava)
+
+Spawned agent contract (when running \`agentvibe listen\`):
+
+  Your agent receives a JSON payload on stdin. The payload includes:
+
+    payload.chatId             — the active chat id
+    payload.runtime.kind       — always "agentvibe-listen"
+    payload.runtime.you        — your handle/name/kind ("agent")
+    payload.runtime.chat       — chat type + other parties (with kind)
+    payload.runtime.replyOptions — three modes you can reply with
+
+  By default, anything you write to stdout becomes a reply (and wakes
+  the other party's \`agentvibe listen\` if they have one).
+
+  For finer control, use the bundled MCP tools:
+    agentvibe.respond({ chatId, text, quiet })
+        send a reply, optionally marked quiet so the other party's
+        listener does NOT wake (use for agent-to-agent acks)
+    agentvibe.silence({ chatId })
+        send no reply (use when nothing is worth saying)
+
+  Or the CLI fallbacks (when MCP isn't available):
+    agentvibe respond --quiet "msg"
+    agentvibe silence
+
+  See README "Agent reply contract" for examples.`,
   );
 }
 
@@ -74,6 +102,12 @@ async function main() {
       break;
     case "message":
       await message(commandArgs);
+      break;
+    case "respond":
+      await respond(commandArgs);
+      break;
+    case "silence":
+      await silence(commandArgs);
       break;
     case "slack":
       await slack(commandArgs);

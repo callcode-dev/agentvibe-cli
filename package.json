@@ -12,6 +12,7 @@
   "files": [
     "dist",
     "manifests",
+    "skills",
     "README.md",
     "LICENSE"
   ],
