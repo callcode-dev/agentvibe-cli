@@ -32,13 +32,10 @@ test("readResponseFile: returns silence envelope", async () => {
 });
 
 test("readResponseFile: returns respond envelope with quiet", async () => {
-  await withTempFile(
-    '{"mode":"respond","text":"hi","quiet":true}',
-    async (file) => {
-      const result = await readResponseFile(file);
-      assert.deepEqual(result, { mode: "respond", text: "hi", quiet: true });
-    }
-  );
+  await withTempFile('{"mode":"respond","text":"hi","quiet":true}', async (file) => {
+    const result = await readResponseFile(file);
+    assert.deepEqual(result, { mode: "respond", text: "hi", quiet: true });
+  });
 });
 
 test("readResponseFile: returns null for malformed JSON", async () => {

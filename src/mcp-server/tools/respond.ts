@@ -4,11 +4,7 @@ import type { AgentVibeClient } from "agentvibe-sdk";
 import type { ToolDeps } from "./index.js";
 import { writeResponseFile } from "../../lib/responseFile.js";
 
-export function registerRespond(
-  server: McpServer,
-  _client: AgentVibeClient,
-  deps: ToolDeps,
-): void {
+export function registerRespond(server: McpServer, _client: AgentVibeClient, deps: ToolDeps): void {
   server.registerTool(
     "respond",
     {
@@ -24,10 +20,7 @@ export function registerRespond(
       inputSchema: {
         chatId: deps.z.string().describe("The chatId from the spawn payload."),
         text: deps.z.string().describe("The reply text."),
-        quiet: deps.z
-          .boolean()
-          .optional()
-          .describe("If true, receiver's listener does not wake."),
+        quiet: deps.z.boolean().optional().describe("If true, receiver's listener does not wake."),
       },
     },
     async ({ chatId, text, quiet }) => {

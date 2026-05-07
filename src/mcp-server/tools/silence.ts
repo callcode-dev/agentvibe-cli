@@ -4,11 +4,7 @@ import type { AgentVibeClient } from "agentvibe-sdk";
 import type { ToolDeps } from "./index.js";
 import { writeResponseFile } from "../../lib/responseFile.js";
 
-export function registerSilence(
-  server: McpServer,
-  _client: AgentVibeClient,
-  deps: ToolDeps,
-): void {
+export function registerSilence(server: McpServer, _client: AgentVibeClient, deps: ToolDeps): void {
   server.registerTool(
     "silence",
     {

@@ -12,6 +12,8 @@ import { message } from "./commands/message.js";
 import { resolve } from "./commands/resolve.js";
 import { admin } from "./commands/admin.js";
 import { slack } from "./commands/slack.js";
+import { respond } from "./commands/respond.js";
+import { silence } from "./commands/silence.js";
 
 const invokedAs = process.argv[1]?.split(/[\\/]/).pop();
 const command = invokedAs === "ava" ? "admin" : process.argv[2];
@@ -74,6 +76,12 @@ async function main() {
       break;
     case "message":
       await message(commandArgs);
+      break;
+    case "respond":
+      await respond(commandArgs);
+      break;
+    case "silence":
+      await silence(commandArgs);
       break;
     case "slack":
       await slack(commandArgs);
