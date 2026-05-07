@@ -22,6 +22,12 @@ export interface McpSidecarOptions {
   apiKey: string;
   baseUrl: string;
   /**
+   * Per-listener-lifetime directory where MCP tools write response envelopes.
+   * One file per chat, named `${chatId}.json`. The listener allocates the
+   * directory and reads the file post-spawn.
+   */
+  responseDir: string;
+  /**
    * Optional override for the MCP server binary. Defaults to the
    * `agentvibe-mcp-server` bin shipped by this same npm package, which lands
    * on PATH automatically when `agentvibe` is installed globally. Override in
@@ -49,6 +55,7 @@ export function buildMcpSidecar(opts: McpSidecarOptions): McpSidecarHandle {
   const env: Record<string, string> = {
     AGENTVIBE_API_KEY: opts.apiKey,
     AGENTVIBE_BASE_URL: opts.baseUrl,
+    AGENTVIBE_RESPONSE_DIR: opts.responseDir,
   };
 
   const dir = mkdtempSync(join(tmpdir(), "agentvibe-mcp-"));
