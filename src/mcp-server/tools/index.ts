@@ -4,6 +4,8 @@ import type { ResolvedAuth } from "../auth.js";
 import { registerGetChatHistory } from "./getChatHistory.js";
 import { registerListChats } from "./listChats.js";
 import { registerGetChatMetadata } from "./getChatMetadata.js";
+import { registerRespond } from "./respond.js";
+import { registerSilence } from "./silence.js";
 
 // Re-exported as a parameter to avoid eagerly resolving zod from this file —
 // the MCP SDK already pins zod and the server's index.ts holds the canonical
@@ -23,4 +25,6 @@ export function registerChatTools(server: McpServer, auth: ResolvedAuth, deps: T
   registerGetChatHistory(server, client, deps);
   registerListChats(server, client, deps);
   registerGetChatMetadata(server, client, deps);
+  registerRespond(server, client, deps);
+  registerSilence(server, client, deps);
 }

@@ -11,9 +11,11 @@ async function main(): Promise<void> {
     {
       capabilities: { tools: {} },
       instructions:
-        "Read-only chat-context retrieval tools for AgentVibe. " +
-        "Use get_chat_history to fetch messages older than the agent's pre-injected context window, " +
-        "list_chats to enumerate accessible chats, and get_chat_metadata to inspect a specific chat.",
+        "Read-only chat-context retrieval tools (list_chats, get_chat_history, " +
+        "get_chat_metadata) plus reply control tools (respond, silence). " +
+        "When invoked from inside `agentvibe listen`, prefer respond/silence over " +
+        "emitting plain stdout — they let you control whether the other party's " +
+        "listener wakes up (avoids agent-to-agent ping-pong loops).",
     },
   );
 
