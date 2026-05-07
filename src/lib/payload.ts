@@ -43,14 +43,33 @@ export interface PayloadContextHints {
   moreHistoryAvailable: boolean;
 }
 
+export interface RuntimeReplyOption {
+  mode: "stdout" | "respond" | "silence";
+  description: string;
+}
+
+export interface RuntimeContext {
+  kind: "agentvibe-listen";
+  you: { handle: string; name: string; kind: "agent" };
+  chat: {
+    type: "dm" | "group";
+    otherParties: Array<{ handle: string; name: string; kind: "human" | "agent" }>;
+  };
+  replyOptions: readonly RuntimeReplyOption[];
+}
+
 export interface AgentPayload {
   chatId: string;
   chatType: "dm" | "group";
   chatName: string;
+  // TODO: redundant with runtime.you (which also carries kind: "agent").
+  // Kept for backwards compat with renderContextPrompt; remove after that
+  // function is migrated to read from runtime.you instead.
   you: { handle: string; name: string };
   newMessages: PayloadMessage[];
   contextMessages: PayloadMessage[];
   contextHints?: PayloadContextHints;
+  runtime: RuntimeContext;
 }
 
 function mapPart(
@@ -111,6 +130,24 @@ function deriveChatName(chat: ChatListItem, myHandle: string): string {
   return other ? `DM with ${other.username}` : "DM";
 }
 
+const REPLY_OPTIONS: readonly RuntimeReplyOption[] = [
+  {
+    mode: "stdout",
+    description:
+      "Default. Anything you write to stdout becomes a normal reply and wakes the other party's listener if they have one. Use for ordinary back-and-forth.",
+  },
+  {
+    mode: "respond",
+    description:
+      "Call agentvibe.respond({ text, quiet: true }) to send a reply that will NOT wake the other party's listener. Use when you're acknowledging but the conversation should end (e.g. another agent just said 'thanks').",
+  },
+  {
+    mode: "silence",
+    description:
+      "Call agentvibe.silence() to send no reply. Use when no message is warranted (you have nothing to add, the message was an FYI, the conversation is over).",
+  },
+];
+
 export function buildPayload(opts: {
   chat: ChatListItem;
   newMessages: ChatMessage[];
@@ -120,6 +157,27 @@ export function buildPayload(opts: {
   contextHints?: PayloadContextHints;
   materialized?: Map<string, MaterializedFile>;
 }): AgentPayload {
+  const otherParties = opts.chat.participants
+    .filter((p) => !p.isYou)
+    .map((p) => ({
+      handle: p.username,
+      name: p.name,
+      // Participant-level kind isn't carried on convex chats today; conservative
+      // default is "human", and per-message kind on PayloadMessage.from already
+      // gives the agent the precise per-message answer.
+      kind: "human" as const,
+    }));
+
+  const runtime: RuntimeContext = {
+    kind: "agentvibe-listen",
+    you: { handle: opts.handle, name: opts.name, kind: "agent" },
+    chat: {
+      type: opts.chat.type,
+      otherParties,
+    },
+    replyOptions: REPLY_OPTIONS,
+  };
+
   return {
     chatId: opts.chat.id,
     chatType: opts.chat.type,
@@ -128,6 +186,7 @@ export function buildPayload(opts: {
     newMessages: opts.newMessages.map((m) => toPayloadMessage(m, opts.materialized)),
     contextMessages: opts.contextMessages.map((m) => toPayloadMessage(m, opts.materialized)),
     ...(opts.contextHints ? { contextHints: opts.contextHints } : {}),
+    runtime,
   };
 }
 
