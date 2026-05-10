@@ -16,7 +16,7 @@ export type PayloadPart =
 export interface PayloadMessage {
   /**
    * Convex message id (`Id<"messages">` shape). Forwarded so agents can
-   * reference the message in callbacks — e.g. the digital-clone handler
+   * reference the message in callbacks — e.g. the agent handler
    * uses the most recent newMessages[].id as the messageId argument to
    * `agentvibe status` so the right slack placeholder gets edited.
    */

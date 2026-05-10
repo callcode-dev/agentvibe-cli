@@ -4,10 +4,10 @@ Open-source AgentVibe CLI for agent runtime context, target resolution, and type
 
 ```bash
 npx -y agentvibe@latest context
-npx -y agentvibe@latest resolve "tanay clone"
-npx -y agentvibe@latest message "tanay clone" "please set up Convex alerts"
+npx -y agentvibe@latest resolve "my agent"
+npx -y agentvibe@latest message "my agent" "please set up Convex alerts"
 npx -y agentvibe@latest message "#ci-cd" "deploy failed"
-npx -y agentvibe@latest slack send tanay-agent "please review this PR"
+npx -y agentvibe@latest slack send my-agent "please review this PR"
 ```
 
 ## Runtime context
@@ -53,10 +53,10 @@ The file is deep-merged over the server runtime context, so it can add friendly 
     "agents": { "type": "slack-channel", "channel": "C123", "label": "agents" }
   },
   "targets": {
-    "tanay-clone": {
+    "my-agent": {
       "type": "slack-user",
       "slackUserId": "U123",
-      "label": "Tanay (clone)",
+      "label": "My Agent",
       "defaultChannel": "agents"
     }
   }
@@ -69,8 +69,8 @@ The CLI can also write that override file for Slack routing:
 
 ```bash
 npx -y agentvibe@latest slack channel add agents --channel C123 --app A123
-npx -y agentvibe@latest slack user add tanay-agent --user U123 --channel agents --label "Tanay (clone)" --alias tanay-clone
-npx -y agentvibe@latest slack send tanay-agent "please review this PR"
+npx -y agentvibe@latest slack user add my-agent --user U123 --channel agents --label "My Agent" --alias agent
+npx -y agentvibe@latest slack send my-agent "please review this PR"
 SLACK_BOT_TOKEN=xoxb-... npx -y agentvibe@latest slack channels
 SLACK_BOT_TOKEN=xoxb-... npx -y agentvibe@latest slack history agents --limit 20
 SLACK_BOT_TOKEN=xoxb-... npx -y agentvibe@latest slack thread 'https://workspace.slack.com/archives/C123/p...?...'
@@ -91,7 +91,7 @@ returns a reply. The contract:
   "chatId": "j5...",
   "chatType": "dm",
   "chatName": "DM with @hudson",
-  "you": { "handle": "tanay-clone", "name": "Tanay's clone" },
+  "you": { "handle": "my-agent", "name": "My Agent" },
   "newMessages": [
     {
       "id": "m_...",
@@ -103,7 +103,7 @@ returns a reply. The contract:
   "contextMessages": [...],
   "runtime": {
     "kind": "agentvibe-listen",
-    "you": { "handle": "tanay-clone", "name": "Tanay's clone", "kind": "agent" },
+    "you": { "handle": "my-agent", "name": "My Agent", "kind": "agent" },
     "chat": {
       "type": "dm",
       "otherParties": [{ "handle": "hudson", "name": "Hudson", "kind": "human" }]

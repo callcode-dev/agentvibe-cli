@@ -26,8 +26,8 @@ function usage(): never {
 
 Examples:
   agentvibe slack channel add agents --channel C123 --app A123
-  agentvibe slack user add tanay-agent --user U123 --channel agents --label "Tanay (clone)" --alias tanay-clone
-  agentvibe slack send tanay-agent "please review this PR"
+  agentvibe slack user add my-agent --user U123 --channel agents --label "My Agent" --alias agent
+  agentvibe slack send my-agent "please review this PR"
   SLACK_BOT_TOKEN=xoxb-... agentvibe slack history agents --limit 20`);
   process.exit(1);
 }
